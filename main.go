@@ -3,67 +3,65 @@ package main
 import (
 	"dapi/internal/aurora"
 	"dapi/internal/tui"
-	"database/sql"
-	"fmt"
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
-	"github.com/gdamore/tcell/v2"
-	"github.com/rivo/tview"
 	flag "github.com/spf13/pflag"
 )
 
 var (
-	resourceArn string
-	secretArn   string
-	database    string
-	region      string
+	flags       = flag.NewFlagSet("dapi", flag.ExitOnError)
+	resourceArn = flags.String("resource-arn", "", "RDS resource ARN")
+	secretArn   = flags.String("secret-arn", "", "RDS secret ARN")
+	dbname      = flags.StringP("dbname", "d", "", "RDS database name")
+	region      = flags.String("region", "ap-northeast-1", "AWS region")
+	help        = flags.BoolP("help", "h", false, "Show help")
 )
 
 func main() {
-	flag.StringVar(&resourceArn, "resource-arn", "", "RDS resource ARN")
-	flag.StringVar(&secretArn, "secret-arn", "", "RDS secret ARN")
-	flag.StringVar(&database, "database", "", "RDS database name")
-	flag.StringVar(&region, "region", "ap-northeast-1", "AWS region")
-	flag.Parse()
+	if err := flags.Parse(os.Args[1:]); err != nil {
+		log.Fatalf("failed to parse flags: %v", err)
+		return
+	}
 
-	startApp()
-}
+	if *help {
+		flags.PrintDefaults()
+		return
+	}
 
-func startApp() {
-	fmt.Print(resourceArn, secretArn, database, region)
 	db, err := aurora.New(
-		resourceArn,
-		secretArn,
-		database,
-		region,
+		*resourceArn,
+		*secretArn,
+		*dbname,
+		*region,
 	)
 	if err != nil {
-		panic(err)
+		log.Fatalf("failed to connect to db: %v", err)
 	}
 	defer func() {
 		if err := db.Close(); err != nil {
-			panic(err)
+			log.Fatalf("failed to close db: %v", err)
 		}
 	}()
-	t := tui.New(db)
+
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-signals
+		if err := db.Close(); err != nil {
+			log.Fatalf("failed to close db: %v", err)
+		}
+		os.Exit(0)
+	}()
+
+	startApp(db)
+}
+
+func startApp(aurora *aurora.DataSource) {
+	t := tui.New(aurora)
 	if err := t.Run(); err != nil {
 		panic(err)
 	}
-}
-
-func Editor(db *sql.DB) *tview.TextArea {
-	textArea := tview.NewTextArea().SetPlaceholder("Enter SQL here...")
-	textArea.SetTitle("Editor").SetBorder(true)
-
-	textArea.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Key() == tcell.KeyCtrlR {
-			row, err := db.Query(textArea.GetText())
-			if err != nil {
-				panic(err)
-			}
-			defer row.Close()
-		}
-		return event
-	})
-
-	return textArea
 }
