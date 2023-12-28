@@ -9,6 +9,7 @@ import (
 
 type DataSource struct {
 	*sql.DB
+	schema string
 }
 
 type Config struct {
@@ -18,7 +19,7 @@ type Config struct {
 	AWSRegion   string
 }
 
-func New(ra, sa, dbname, r string) (*DataSource, error) {
+func New(ra, sa, dbname, r, s string) (*DataSource, error) {
 	conf := &rds.Config{
 		ResourceArn: ra,
 		SecretArn:   sa,
@@ -34,11 +35,12 @@ func New(ra, sa, dbname, r string) (*DataSource, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &DataSource{db}, nil
+	return &DataSource{db, s}, nil
 }
 
 func (ds *DataSource) Tables() ([]string, error) {
-	rows, err := ds.Query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';")
+	query := fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_schema = '%s';", ds.schema)
+	rows, err := ds.Query(query)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +62,7 @@ func (ds *DataSource) Preview(table string) ([][]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	query := fmt.Sprintf("SELECT %s FROM %s LIMIT 10;", wildcard, table)
+	query := fmt.Sprintf("SELECT %s FROM %s LIMIT 50;", wildcard, table)
 	return ds.query(query)
 }
 
@@ -91,7 +93,7 @@ func (ds *DataSource) query(query string) ([][]string, error) {
 }
 
 func (ds *DataSource) introspect(table string) ([][]string, error) {
-	query := fmt.Sprintf("SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = '%s';", table)
+	query := fmt.Sprintf("SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = '%s' AND table_name = '%s';", ds.schema, table)
 	rows, err := ds.Query(query)
 	if err != nil {
 		return nil, fmt.Errorf("query: %s err: %w", query, err)

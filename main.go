@@ -16,6 +16,7 @@ var (
 	resourceArn = flags.String("resource-arn", "", "RDS resource ARN")
 	secretArn   = flags.String("secret-arn", "", "RDS secret ARN")
 	dbname      = flags.StringP("dbname", "d", "", "RDS database name")
+	schema      = flags.StringP("schema", "s", "public", "RDS schema name")
 	region      = flags.String("region", "ap-northeast-1", "AWS region")
 	help        = flags.BoolP("help", "h", false, "Show help")
 )
@@ -36,6 +37,7 @@ func main() {
 		*secretArn,
 		*dbname,
 		*region,
+		*schema,
 	)
 	if err != nil {
 		log.Fatalf("failed to connect to db: %v", err)

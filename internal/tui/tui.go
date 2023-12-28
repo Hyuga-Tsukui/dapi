@@ -48,7 +48,7 @@ func New(db DB) *TUI {
 		return event
 	})
 
-	t.Initialize()
+	t.initialize()
 
 	return t
 }
@@ -63,7 +63,7 @@ func (t *TUI) Run() error {
 	return t.App.SetRoot(flex, true).EnableMouse(true).Run()
 }
 
-func (t *TUI) Initialize() {
+func (t *TUI) initialize() {
 	tables, err := t.db.Tables()
 	if err != nil {
 		panic(err)
