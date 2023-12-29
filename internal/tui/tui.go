@@ -9,7 +9,7 @@ type TUI struct {
 	db         DB
 	App        *tview.Application
 	Tables     *tview.List
-	Preview    *tview.TextView
+	Preview    *tview.Table
 	QueryInput *tview.InputField
 	Footer     *tview.TextView
 }
@@ -28,7 +28,7 @@ func New(db DB) *TUI {
 	t.Tables = tview.NewList()
 	t.Tables.SetBorder(true).SetTitle("Tables")
 
-	t.Preview = tview.NewTextView()
+	t.Preview = tview.NewTable().SetBorders(true)
 	t.Preview.SetTitle("Preview").SetBorder(true)
 
 	t.QueryInput = tview.NewInputField()
@@ -77,32 +77,36 @@ func (t *TUI) initialize() {
 }
 
 func (t *TUI) preview() {
-	defer func() {
-		if r := recover(); r != nil {
-			t.queueUpdateDraw(func() {
-				t.Preview.SetText(r.(error).Error())
-			})
-		}
-	}()
-
 	table, _ := t.Tables.GetItemText(t.Tables.GetCurrentItem())
-	preview, err := t.db.Preview(table)
+	headers, data, err := t.db.Preview(table)
 	if err != nil {
 		panic(err)
 	}
 
 	t.queueUpdateDraw(func() {
 		t.Preview.Clear()
-		if len(preview) == 1 {
-			t.Preview.SetText("No rows")
-			return
+
+		for i, header := range headers {
+			t.Preview.SetCell(
+				0,
+				i,
+				tview.NewTableCell(header).
+					SetTextColor(tcell.ColorYellow).
+					SetAlign(tview.AlignLeft),
+			)
 		}
 
-		for _, row := range preview {
-			for _, col := range row {
-				t.Preview.Write([]byte(col + "\t"))
+		for i, row := range data {
+			for j, col := range row {
+				t.Preview.SetCell(
+					i+1,
+					j,
+					tview.NewTableCell(col).
+						SetTextColor(tcell.ColorWhite).
+						SetAlign(tview.AlignLeft),
+				)
 			}
-			t.Preview.Write([]byte("\n"))
 		}
+		t.App.SetFocus(t.Preview)
 	})
 }

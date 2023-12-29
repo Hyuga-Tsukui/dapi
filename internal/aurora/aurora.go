@@ -57,27 +57,27 @@ func (ds *DataSource) Tables() ([]string, error) {
 	return tables, nil
 }
 
-func (ds *DataSource) Preview(table string) ([][]string, error) {
+func (ds *DataSource) Preview(table string) ([]string, [][]string, error) {
 	wildcard, err := ds.wildcard(table)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	query := fmt.Sprintf("SELECT %s FROM %s LIMIT 50;", wildcard, table)
 	return ds.query(query)
 }
 
-func (ds *DataSource) query(query string) ([][]string, error) {
+func (ds *DataSource) query(query string) ([]string, [][]string, error) {
 	rows, err := ds.DB.Query(query)
 	if err != nil {
-		return nil, fmt.Errorf("query: %s err: %w", query, err)
+		return nil, nil, fmt.Errorf("query: %s err: %w", query, err)
 	}
 	defer rows.Close()
 
 	cols, err := rows.Columns()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	table := [][]string{cols}
+	table := [][]string{}
 	for rows.Next() {
 		cols := make([]string, len(cols))
 		colsPtr := make([]interface{}, len(cols))
@@ -85,11 +85,11 @@ func (ds *DataSource) query(query string) ([][]string, error) {
 			colsPtr[i] = &cols[i]
 		}
 		if err := rows.Scan(colsPtr...); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		table = append(table, cols)
 	}
-	return table, nil
+	return cols, table, nil
 }
 
 func (ds *DataSource) introspect(table string) ([][]string, error) {
