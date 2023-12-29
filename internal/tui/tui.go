@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"fmt"
+
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
@@ -18,8 +20,9 @@ type TUI struct {
 	App    *tview.Application
 	Tables *tview.List
 
-	Preview            *tview.Table
+	Preview            *Preview
 	CurrentPreviewName string
+	CurrentPreviewPage int
 
 	QueryInput *tview.InputField
 	Footer     *tview.TextView
@@ -52,9 +55,7 @@ func New(db DB) *TUI {
 	t.Tables.SetSelectedStyle(tcell.StyleDefault.Background(DialogBgColor).Foreground(DialogFgColor))
 	t.Tables.SetBorder(true).SetTitle("Tables").SetTitleAlign(tview.AlignLeft)
 
-	t.Preview = tview.NewTable()
-	t.Preview.SetBorder(true).SetTitleAlign(tview.AlignLeft).SetTitleColor(tcell.ColorYellow)
-	t.Preview.SetSelectedStyle(tcell.StyleDefault.Background(DialogBgColor).Foreground(DialogFgColor))
+	t.Preview = NewPreview()
 
 	t.QueryInput = tview.NewInputField().SetPlaceholder("input condition here (e.g. id = 1)").SetPlaceholderStyle(tcell.StyleDefault.Foreground(tcell.ColorGray))
 	t.QueryInput.SetTitle("Filter").SetBorder(true).SetTitleAlign(tview.AlignLeft)
@@ -74,6 +75,7 @@ func New(db DB) *TUI {
 	t.Tables.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Rune() {
 		case 'p':
+			t.CurrentPreviewPage = 1
 			t.preview()
 		case 'j':
 			t.Tables.SetCurrentItem(t.Tables.GetCurrentItem() + 1)
@@ -93,7 +95,7 @@ func (t *TUI) Run() error {
 
 	previewArea := tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(t.QueryInput, 0, 1, false).
-		AddItem(t.Preview, 0, 9, false)
+		AddItem(t.Preview, 0, 8, false)
 
 	contentArea := tview.NewFlex().SetDirection(tview.FlexColumn).
 		AddItem(t.Tables, 0, 1, true).
@@ -121,39 +123,18 @@ func (t *TUI) initialize() {
 
 func (t *TUI) preview() {
 	table, _ := t.Tables.GetItemText(t.Tables.GetCurrentItem())
-	headers, data, err := t.db.Preview(table)
+	headers, data, maxDataLen, err := t.db.Preview(table)
 	if err != nil {
 		panic(err)
 	}
 
 	t.queueUpdateDraw(func() {
-		t.Preview.Clear()
-
-		t.Preview.SetTitle(table)
-
-		for i, header := range headers {
-			t.Preview.SetCell(
-				0,
-				i,
-				tview.NewTableCell(header).
-					SetAlign(tview.AlignLeft).
-					SetBackgroundColor(MenuBgColor).
-					SetSelectable(false),
-			)
-		}
-
-		for i, row := range data {
-			for j, col := range row {
-				t.Preview.SetCell(
-					i+1,
-					j,
-					tview.NewTableCell(col).
-						SetTextColor(tcell.ColorWhite).
-						SetAlign(tview.AlignLeft),
-				)
-			}
-		}
-		t.Preview.SetSelectable(true, false)
+		t.Preview.SetData(headers, data)
+		// TODO: fix this.
+		// Pagenationのためのカウント取得は切り出す.
+		currentPage := t.CurrentPreviewPage
+		t.Preview.SetTitle(fmt.Sprintf("%s %d/%d", table, currentPage, maxDataLen/50+1))
+		t.Preview.SetSelectable(true)
 		t.App.SetFocus(t.Preview)
 	})
 }
@@ -173,33 +154,8 @@ func (t *TUI) filter() {
 	}
 
 	t.queueUpdateDraw(func() {
-		t.Preview.Clear()
-
-		t.Preview.SetTitle(table)
-
-		for i, header := range headers {
-			t.Preview.SetCell(
-				0,
-				i,
-				tview.NewTableCell(header).
-					SetAlign(tview.AlignLeft).
-					SetBackgroundColor(MenuBgColor).
-					SetSelectable(false),
-			)
-		}
-
-		for i, row := range data {
-			for j, col := range row {
-				t.Preview.SetCell(
-					i+1,
-					j,
-					tview.NewTableCell(col).
-						SetTextColor(tcell.ColorWhite).
-						SetAlign(tview.AlignLeft),
-				)
-			}
-		}
-		t.Preview.SetSelectable(true, false)
+		t.Preview.SetData(headers, data)
+		t.Preview.SetSelectable(true)
 		t.App.SetFocus(t.Preview)
 	})
 }

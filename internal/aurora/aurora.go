@@ -57,13 +57,19 @@ func (ds *DataSource) Tables() ([]string, error) {
 	return tables, nil
 }
 
-func (ds *DataSource) Preview(table string) ([]string, [][]string, error) {
+func (ds *DataSource) Preview(table string) ([]string, [][]string, int, error) {
 	wildcard, err := ds.wildcard(table)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, 0, err
+	}
+	var count int
+	err = ds.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM %s;", table)).Scan(&count)
+	if err != nil {
+		return nil, nil, 0, err
 	}
 	query := fmt.Sprintf("SELECT %s FROM %s LIMIT 50;", wildcard, table)
-	return ds.query(query)
+	headers, data, err := ds.query(query)
+	return headers, data, count, err
 }
 
 func (ds *DataSource) query(query string) ([]string, [][]string, error) {
