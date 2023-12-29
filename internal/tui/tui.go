@@ -5,11 +5,22 @@ import (
 	"github.com/rivo/tview"
 )
 
+// styles.
+var (
+	BgColor       = tview.Styles.PrimitiveBackgroundColor
+	MenuBgColor   = tcell.ColorMediumPurple
+	DialogBgColor = tcell.ColorDarkSlateGray
+	DialogFgColor = tcell.ColorFloralWhite
+)
+
 type TUI struct {
-	db         DB
-	App        *tview.Application
-	Tables     *tview.List
-	Preview    *tview.Table
+	db     DB
+	App    *tview.Application
+	Tables *tview.List
+
+	Preview            *tview.Table
+	CurrentPreviewName string
+
 	QueryInput *tview.InputField
 	Footer     *tview.TextView
 }
@@ -25,11 +36,23 @@ func New(db DB) *TUI {
 
 	t.App = tview.NewApplication()
 
+	t.App.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		switch event.Key() {
+		case tcell.KeyF1:
+			t.App.SetFocus(t.Tables)
+		case tcell.KeyF2:
+			t.App.SetFocus(t.Preview)
+		}
+		return event
+	})
+
 	t.Tables = tview.NewList()
+	t.Tables.SetSelectedStyle(tcell.StyleDefault.Background(DialogBgColor).Foreground(DialogFgColor))
 	t.Tables.SetBorder(true).SetTitle("Tables")
 
-	t.Preview = tview.NewTable().SetBorders(true)
-	t.Preview.SetTitle("Preview").SetBorder(true)
+	t.Preview = tview.NewTable()
+	t.Preview.SetBorder(true).SetTitleAlign(tview.AlignLeft).SetTitleColor(tcell.ColorYellow)
+	t.Preview.SetSelectedStyle(tcell.StyleDefault.Background(DialogBgColor).Foreground(DialogFgColor))
 
 	t.QueryInput = tview.NewInputField()
 	t.QueryInput.SetTitle("Query").SetBorder(true)
@@ -57,8 +80,8 @@ func (t *TUI) Run() error {
 	flex := tview.NewFlex().
 		AddItem(t.Tables, 0, 1, true).
 		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
-			AddItem(t.Preview, 0, 1, false).
-			AddItem(t.QueryInput, 0, 1, true), 0, 4, false)
+			AddItem(t.Preview, 0, 1, false),
+			0, 4, false)
 
 	return t.App.SetRoot(flex, true).EnableMouse(true).Run()
 }
@@ -86,13 +109,16 @@ func (t *TUI) preview() {
 	t.queueUpdateDraw(func() {
 		t.Preview.Clear()
 
+		t.Preview.SetTitle(table)
+
 		for i, header := range headers {
 			t.Preview.SetCell(
 				0,
 				i,
 				tview.NewTableCell(header).
-					SetTextColor(tcell.ColorYellow).
-					SetAlign(tview.AlignLeft),
+					SetAlign(tview.AlignLeft).
+					SetBackgroundColor(MenuBgColor).
+					SetSelectable(false),
 			)
 		}
 
@@ -107,6 +133,7 @@ func (t *TUI) preview() {
 				)
 			}
 		}
+		t.Preview.SetSelectable(true, false)
 		t.App.SetFocus(t.Preview)
 	})
 }
