@@ -140,3 +140,12 @@ func (ds *DataSource) wildcard(table string) (string, error) {
 	}
 	return wildcard, nil
 }
+
+func (ds *DataSource) Filter(table string, condition string) ([]string, [][]string, error) {
+	wildcard, err := ds.wildcard(table)
+	if err != nil {
+		return nil, nil, err
+	}
+	query := fmt.Sprintf("SELECT %s FROM %s WHERE %s LIMIT 50;", wildcard, table, condition)
+	return ds.query(query)
+}
