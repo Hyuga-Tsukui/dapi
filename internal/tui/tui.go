@@ -21,7 +21,6 @@ type TUI struct {
 	Tables *tview.List
 
 	Preview            *Preview
-	CurrentPreviewName string
 	CurrentPreviewPage int
 
 	QueryInput *tview.InputField
@@ -56,6 +55,17 @@ func New(db DB) *TUI {
 	t.Tables.SetBorder(true).SetTitle("Tables").SetTitleAlign(tview.AlignLeft)
 
 	t.Preview = NewPreview()
+	t.Preview.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		switch event.Key() {
+		case tcell.KeyEnter:
+			t.CurrentPreviewPage++
+			t.preview()
+		case tcell.KeyCtrlL:
+			t.CurrentPreviewPage = 1
+			t.preview()
+		}
+		return event
+	})
 
 	t.QueryInput = tview.NewInputField().SetPlaceholder("input condition here (e.g. id = 1)").SetPlaceholderStyle(tcell.StyleDefault.Foreground(tcell.ColorGray))
 	t.QueryInput.SetTitle("Filter").SetBorder(true).SetTitleAlign(tview.AlignLeft)
@@ -122,18 +132,14 @@ func (t *TUI) initialize() {
 }
 
 func (t *TUI) preview() {
-	table, _ := t.Tables.GetItemText(t.Tables.GetCurrentItem())
-	headers, data, maxDataLen, err := t.db.Preview(table)
+	tableName, _ := t.Tables.GetItemText(t.Tables.GetCurrentItem())
+	table, err := t.db.GetTable(tableName, t.CurrentPreviewPage)
 	if err != nil {
 		panic(err)
 	}
-
 	t.queueUpdateDraw(func() {
-		t.Preview.SetData(headers, data)
-		// TODO: fix this.
-		// Pagenationのためのカウント取得は切り出す.
-		currentPage := t.CurrentPreviewPage
-		t.Preview.SetTitle(fmt.Sprintf("%s %d/%d", table, currentPage, maxDataLen/50+1))
+		t.Preview.SetData(table.Headers, table.Content)
+		t.Preview.SetTitle(fmt.Sprintf("%s %d/%d", tableName, t.CurrentPreviewPage, table.TotalCount/50+1))
 		t.Preview.SetSelectable(true)
 		t.App.SetFocus(t.Preview)
 	})

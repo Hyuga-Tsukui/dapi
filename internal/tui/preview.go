@@ -13,7 +13,7 @@ type Preview struct {
 
 func NewPreview() *Preview {
 	p := &Preview{
-		Box: tview.NewBox().SetTitle("PREVIEW"),
+		Box: tview.NewBox(),
 	}
 	p.table = tview.NewTable()
 	p.table.SetBorder(true).SetTitleAlign(tview.AlignLeft).SetTitleColor(tcell.ColorYellow)
@@ -33,6 +33,12 @@ func (p *Preview) SetData(header []string, data [][]string) {
 	}
 }
 
+// SetTitle sets the title of this primitive.
+func (p *Preview) SetTitle(title string) {
+	p.table.SetTitle(title)
+}
+
+// SetSelectable sets the flag that indicates whether or not this primitive
 func (p *Preview) SetSelectable(selectable bool) {
 	p.table.SetSelectable(selectable, false)
 }

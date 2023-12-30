@@ -1,6 +1,7 @@
 package aurora
 
 import (
+	"dapi/internal/tui"
 	"database/sql"
 	"fmt"
 
@@ -154,4 +155,33 @@ func (ds *DataSource) Filter(table string, condition string) ([]string, [][]stri
 	}
 	query := fmt.Sprintf("SELECT %s FROM %s WHERE %s LIMIT 50;", wildcard, table, condition)
 	return ds.query(query)
+}
+
+func (ds *DataSource) GetTable(name string, page int) (*tui.Table, error) {
+	wildcard, err := ds.wildcard(name)
+	if err != nil {
+		return nil, err
+	}
+	var count int
+	err = ds.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM %s;", name)).Scan(&count)
+	if err != nil {
+		return nil, err
+	}
+	query := fmt.Sprintf("SELECT %s FROM %s LIMIT 50 OFFSET %d;", wildcard, name, (page-1)*50)
+	headers, data, err := ds.query(query)
+	if err != nil {
+		return nil, err
+	}
+
+	if count/50 < page {
+		page = 1
+	}
+
+	return &tui.Table{
+		Name:       name,
+		Headers:    headers,
+		Content:    data,
+		TotalCount: count,
+		CntPage:    page,
+	}, nil
 }
